@@ -30,3 +30,8 @@ For webhook setup:
 Be sure to set up Ngrok and point it at your localhost URL
 
 You can find a good starting prompt in AGENT_PROMPT.md
+
+cmds to run
+`pnpm run dev`
+`ngrok http 3000`
+`docker start corsair`

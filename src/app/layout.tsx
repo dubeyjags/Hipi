@@ -5,7 +5,7 @@ import { type Metadata } from "next";
 import { TRPCReactProvider } from "@/trpc/react";
 
 export const metadata: Metadata = {
-  title: "Google Demo",
+  title: "HiPi",
   description: "Gmail and Calendar demo powered by Corsair",
   icons: [{ rel: "icon", url: "/favicon.ico" }],
 };

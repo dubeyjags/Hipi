@@ -10,10 +10,16 @@ import {
 import { formatWeekLabel, getWeekBounds } from "@/lib/week";
 import { api } from "@/trpc/react";
 
-function toDatetimeLocalValue(date: Date) {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
+const EVENT_COLORS = [
+  "bg-[#1a73e8]",
+  "bg-[#0f9d58]",
+  "bg-[#f4511e]",
+  "bg-[#7986cb]",
+  "bg-[#33b679]",
+  "bg-[#d50000]",
+  "bg-[#8e24aa]",
+  "bg-[#f09300]",
+];
 
 export function CalendarPanel() {
   const [search, setSearch] = useState("");
@@ -22,18 +28,6 @@ export function CalendarPanel() {
 
   const week = useMemo(() => getWeekBounds(weekOffset), [weekOffset]);
   const weekLabel = formatWeekLabel(week.start, week.end);
-
-  const defaultStart = new Date();
-  defaultStart.setMinutes(0, 0, 0);
-  const defaultEnd = new Date(defaultStart);
-  defaultEnd.setHours(defaultEnd.getHours() + 1);
-
-  const [summary, setSummary] = useState("");
-  const [description, setDescription] = useState("");
-  const [location, setLocation] = useState("");
-  const [start, setStart] = useState(toDatetimeLocalValue(defaultStart));
-  const [end, setEnd] = useState(toDatetimeLocalValue(defaultEnd));
-  const [attendees, setAttendees] = useState("");
 
   const utils = api.useUtils();
 
@@ -51,53 +45,48 @@ export function CalendarPanel() {
     },
   });
 
-  const createDraft = api.calendar.createDraft.useMutation({
-    onSuccess: async () => {
-      await utils.calendar.searchEvents.invalidate();
-      resetForm();
-    },
-  });
-
-  const sendInvite = api.calendar.sendInvite.useMutation({
-    onSuccess: async () => {
-      await utils.calendar.searchEvents.invalidate();
-      resetForm();
-    },
-  });
-
-  function resetForm() {
-    setSummary("");
-    setDescription("");
-    setLocation("");
-    setAttendees("");
-  }
-
-  function parseAttendees() {
-    return attendees
-      .split(",")
-      .map((a) => a.trim())
-      .filter(Boolean);
-  }
-
-  function toIso(datetimeLocal: string) {
-    return new Date(datetimeLocal).toISOString();
-  }
-
-  const eventInput = {
-    summary,
-    description: description || undefined,
-    location: location || undefined,
-    start: toIso(start),
-    end: toIso(end),
-    attendees: parseAttendees(),
-  };
-
   return (
-    <div>
-      <p>
+    <div className="flex flex-col gap-4">
+      {/* Week Navigation Bar */}
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-[#dadce0] bg-white px-4 py-3 shadow-sm">
+        <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            onClick={() => setWeekOffset((w) => w - 1)}
+            aria-label="Previous week"
+            className="rounded-full p-2 text-[#5f6368] transition-colors hover:bg-[#f1f3f4]"
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            onClick={() => setWeekOffset((w) => w + 1)}
+            aria-label="Next week"
+            className="rounded-full p-2 text-[#5f6368] transition-colors hover:bg-[#f1f3f4]"
+          >
+            ›
+          </button>
+        </div>
+
+        <h2
+          suppressHydrationWarning
+          className="flex-1 text-lg font-normal text-[#202124]"
+        >
+          {weekLabel}
+        </h2>
+
+        {weekOffset !== 0 && (
+          <button
+            type="button"
+            onClick={() => setWeekOffset(0)}
+            className="rounded-full border border-[#dadce0] px-4 py-1.5 text-sm font-medium text-[#1a73e8] transition-colors hover:bg-[#e8f0fe]"
+          >
+            Today
+          </button>
+        )}
+
         <button
           type="button"
-          className="link"
           onClick={() =>
             refreshEvents.mutate({
               weekStart: week.start.toISOString(),
@@ -105,192 +94,139 @@ export function CalendarPanel() {
             })
           }
           disabled={refreshEvents.isPending}
+          className="rounded-full px-3 py-1.5 text-sm text-[#1a73e8] transition-colors hover:bg-[#e8f0fe] disabled:opacity-50"
         >
-          {refreshEvents.isPending ? "refreshing…" : "refresh from calendar"}
+          {refreshEvents.isPending ? "Refreshing…" : "↻ Refresh"}
         </button>
         {refreshEvents.data && (
-          <span className="muted"> ({refreshEvents.data.synced} synced)</span>
+          <span className="text-xs text-[#5f6368]">
+            {refreshEvents.data.synced} synced
+          </span>
         )}
-      </p>
-
-      <div className="week-nav">
-        <button
-          type="button"
-          onClick={() => setWeekOffset((w) => w - 1)}
-          aria-label="Previous week"
-        >
-          ←
-        </button>{" "}
-        <strong>{weekLabel}</strong>
-        {weekOffset !== 0 && (
-          <>
-            {" "}
-            <button type="button" className="link" onClick={() => setWeekOffset(0)}>
-              this week
-            </button>
-          </>
-        )}
-        {" "}
-        <button
-          type="button"
-          onClick={() => setWeekOffset((w) => w + 1)}
-          aria-label="Next week"
-        >
-          →
-        </button>
       </div>
 
+      {/* Search */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
           setActiveSearch(search);
         }}
+        className="flex gap-2"
       >
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="search events"
-        />
-        <p>
-          <button type="submit">search</button>{" "}
-          <button
-            type="button"
-            onClick={() => {
-              setSearch("");
-              setActiveSearch("");
-            }}
+        <div className="flex flex-1 items-center gap-2 rounded-full border border-[#dadce0] bg-white px-4 shadow-sm transition-shadow hover:shadow-md">
+          <svg
+            className="h-4 w-4 shrink-0 text-[#5f6368]"
+            viewBox="0 0 20 20"
+            fill="currentColor"
           >
-            clear
-          </button>
-        </p>
+            <path
+              fillRule="evenodd"
+              d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
+              clipRule="evenodd"
+            />
+          </svg>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search events"
+            className="flex-1 bg-transparent py-3 text-sm text-[#202124] outline-none placeholder:text-[#5f6368]"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearch("");
+                setActiveSearch("");
+              }}
+              className="text-lg leading-none text-[#5f6368] hover:text-[#202124]"
+            >
+              ×
+            </button>
+          )}
+        </div>
+        <button
+          type="submit"
+          className="rounded-full bg-[#1a73e8] px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-[#1557b0]"
+        >
+          Search
+        </button>
       </form>
 
-      {events.isLoading && <p className="muted">Loading…</p>}
-      {events.error && <p className="error">{events.error.message}</p>}
+      {/* Events List */}
+      <div className="overflow-hidden rounded-2xl border border-[#dadce0] bg-white shadow-sm">
+        <div className="border-b border-[#dadce0] px-6 py-4">
+          <h2 className="text-sm font-medium text-[#202124]">Events</h2>
+        </div>
 
-      {events.data && (
-        <>
-          <h2>Events</h2>
-          {events.data.length === 0 ? (
-            <p className="muted">No events this week.</p>
-          ) : (
-            <ul>
-              {events.data.map((event) => (
-                <li key={event.id}>
+        {events.isLoading && (
+          <div className="px-6 py-10 text-center text-sm text-[#5f6368]">
+            Loading…
+          </div>
+        )}
+        {events.error && (
+          <div className="px-6 py-4 text-sm text-[#d93025]">
+            {events.error.message}
+          </div>
+        )}
+        {events.data?.length === 0 && (
+          <div className="px-6 py-12 text-center text-sm text-[#5f6368]">
+            No events this week.
+          </div>
+        )}
+        {events.data && events.data.length > 0 && (
+          <ul className="divide-y divide-[#e8eaed]">
+            {events.data.map((event, i) => (
+              <li
+                key={event.id}
+                className="flex gap-4 px-6 py-4 transition-colors hover:bg-[#f6f8fc]"
+              >
+                {/* Color accent bar */}
+                <div
+                  className={`w-1 shrink-0 self-stretch rounded-sm ${EVENT_COLORS[i % EVENT_COLORS.length]}`}
+                />
+                <div className="min-w-0 flex-1">
                   {event.htmlLink ? (
                     <a
                       href={event.htmlLink}
                       target="_blank"
                       rel="noopener noreferrer"
+                      className="text-sm font-medium text-[#1a73e8] hover:underline"
                     >
-                      {event.summary || "untitled"}
+                      {event.summary ?? "Untitled"}
                     </a>
                   ) : (
-                    <strong>{event.summary || "untitled"}</strong>
+                    <span className="text-sm font-medium text-[#202124]">
+                      {event.summary ?? "Untitled"}
+                    </span>
                   )}
                   {event.start && (
-                    <p className="muted">
-                      {formatEventWhen(event.start, event.end)}
+                    <p className="mt-0.5 text-xs text-[#5f6368]">
+                      🕐 {formatEventWhen(event.start, event.end)}
                     </p>
                   )}
                   {event.location && (
-                    <p className="muted">{event.location}</p>
+                    <p className="mt-0.5 text-xs text-[#5f6368]">
+                      📍 {event.location}
+                    </p>
                   )}
                   {event.description && (
-                    <p>
+                    <p className="mt-1 line-clamp-2 text-xs text-[#5f6368]">
                       <LinkifiedText text={event.description} />
                     </p>
                   )}
                   {event.attendees.length > 0 && (
-                    <p className="muted">{formatAttendees(event.attendees)}</p>
+                    <p className="mt-0.5 text-xs text-[#5f6368]">
+                      👥 {formatAttendees(event.attendees)}
+                    </p>
                   )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </>
-      )}
-
-      <hr />
-
-      <h2>Create event</h2>
-      <form onSubmit={(e) => e.preventDefault()}>
-        <label>
-          title
-          <input
-            type="text"
-            value={summary}
-            onChange={(e) => setSummary(e.target.value)}
-          />
-        </label>
-        <label>
-          description
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-        </label>
-        <label>
-          location
-          <input
-            type="text"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-          />
-        </label>
-        <label>
-          start
-          <input
-            type="datetime-local"
-            value={start}
-            onChange={(e) => setStart(e.target.value)}
-          />
-        </label>
-        <label>
-          end
-          <input
-            type="datetime-local"
-            value={end}
-            onChange={(e) => setEnd(e.target.value)}
-          />
-        </label>
-        <label>
-          attendees (comma-separated)
-          <input
-            type="text"
-            value={attendees}
-            onChange={(e) => setAttendees(e.target.value)}
-          />
-        </label>
-        <p>
-          <button
-            type="button"
-            onClick={() => createDraft.mutate(eventInput)}
-            disabled={createDraft.isPending || !summary || !start || !end}
-          >
-            {createDraft.isPending ? "saving…" : "save draft"}
-          </button>{" "}
-          <button
-            type="button"
-            onClick={() => sendInvite.mutate(eventInput)}
-            disabled={
-              sendInvite.isPending ||
-              !summary ||
-              !start ||
-              !end ||
-              parseAttendees().length === 0
-            }
-          >
-            {sendInvite.isPending ? "sending…" : "send invite"}
-          </button>
-        </p>
-        {(createDraft.error ?? sendInvite.error) && (
-          <p className="error">
-            {(createDraft.error ?? sendInvite.error)?.message}
-          </p>
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
-      </form>
+      </div>
+
     </div>
   );
 }

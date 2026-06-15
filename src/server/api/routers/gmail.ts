@@ -73,7 +73,7 @@ export const gmailRouter = createTRPCRouter({
   searchEmails: publicProcedure
     .input(
       paginationSchema.extend({
-        query: z.string(),
+        query: z.string().default(""),
       }),
     )
     .query(async ({ input }) => {
